@@ -39,37 +39,31 @@ class TechnicalIndicatorServiceTest {
 
     @Test
     void testCalculateAndStoreRSI_WithSufficientData_StoresRSI() {
-        // Arrange
         String symbol = "AAPL";
-        List<JdbcStockPriceRepository.PriceData> prices = createMockPriceData(20); // 20 days of data
+        List<JdbcStockPriceRepository.PriceData> prices = createMockPriceData(20);
 
         when(stockPriceRepository.getPricesForDateRange(eq(symbol), any(LocalDate.class), any(LocalDate.class)))
             .thenReturn(prices);
-        doNothing().when(technicalIndicatorRepository).upsertRSI(eq(symbol), any(LocalDate.class), any(BigDecimal.class));
+        doNothing().when(technicalIndicatorRepository).upsertRSI(eq(symbol), any(LocalDate.class), eq("1d"), any(BigDecimal.class));
 
-        // Act
         service.calculateAndStoreRSI(symbol);
 
-        // Assert
         verify(technicalIndicatorRepository, times(1))
-            .upsertRSI(eq(symbol), any(LocalDate.class), any(BigDecimal.class));
+            .upsertRSI(eq(symbol), any(LocalDate.class), eq("1d"), any(BigDecimal.class));
     }
 
     @Test
     void testCalculateAndStoreRSI_WithInsufficientData_DoesNotStore() {
-        // Arrange
         String symbol = "AAPL";
-        List<JdbcStockPriceRepository.PriceData> prices = createMockPriceData(10); // Only 10 days (need 14)
+        List<JdbcStockPriceRepository.PriceData> prices = createMockPriceData(10);
 
         when(stockPriceRepository.getPricesForDateRange(eq(symbol), any(LocalDate.class), any(LocalDate.class)))
             .thenReturn(prices);
 
-        // Act
         service.calculateAndStoreRSI(symbol);
 
-        // Assert
         verify(technicalIndicatorRepository, never())
-            .upsertRSI(anyString(), any(LocalDate.class), any(BigDecimal.class));
+            .upsertRSI(anyString(), any(LocalDate.class), anyString(), any(BigDecimal.class));
     }
 
     @Test

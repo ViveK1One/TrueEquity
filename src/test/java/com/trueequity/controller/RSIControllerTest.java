@@ -1,5 +1,6 @@
 package com.trueequity.controller;
 
+import com.trueequity.repository.JdbcTechnicalIndicatorRepository;
 import com.trueequity.service.TechnicalIndicatorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,11 +15,12 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
  * Integration tests for RSIController
- * Tests REST API endpoint behavior
+ * Controller reads from repository first, then falls back to service.
  */
 @ExtendWith(MockitoExtension.class)
 class RSIControllerTest {
@@ -26,17 +28,20 @@ class RSIControllerTest {
     @Mock
     private TechnicalIndicatorService technicalIndicatorService;
 
+    @Mock
+    private JdbcTechnicalIndicatorRepository technicalIndicatorRepository;
+
     @InjectMocks
     private RSIController rsiController;
 
     @BeforeEach
     void setUp() {
-        // Controller is already injected via @InjectMocks
+        // Repository returns null by default so controller falls back to service
+        when(technicalIndicatorRepository.getLatestRSIForTimeframe(anyString(), anyString())).thenReturn(null);
     }
 
     @Test
     void testGetRSI_WithValidSymbolAndTimeframe_ReturnsRSI() {
-        // Arrange
         String symbol = "AAPL";
         String timeframe = "1d";
         BigDecimal expectedRSI = BigDecimal.valueOf(45.5);
@@ -44,10 +49,8 @@ class RSIControllerTest {
         when(technicalIndicatorService.calculateRSIForTimeframe(symbol.toUpperCase(), timeframe))
             .thenReturn(expectedRSI);
 
-        // Act
         ResponseEntity<Map<String, Object>> response = rsiController.getRSI(symbol, timeframe);
 
-        // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(expectedRSI.doubleValue(), (Double) response.getBody().get("rsi"), 0.01);
@@ -57,18 +60,15 @@ class RSIControllerTest {
 
     @Test
     void testGetRSI_WithNullRSI_Returns200WithError() {
-        // Arrange
         String symbol = "INVALID";
         String timeframe = "1d";
 
         when(technicalIndicatorService.calculateRSIForTimeframe(symbol.toUpperCase(), timeframe))
             .thenReturn(null);
 
-        // Act
         ResponseEntity<Map<String, Object>> response = rsiController.getRSI(symbol, timeframe);
 
-        // Assert
-        assertEquals(HttpStatus.OK, response.getStatusCode()); // Returns 200 even if RSI is null
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertNull(response.getBody().get("rsi"));
         assertNotNull(response.getBody().get("error"));
@@ -78,17 +78,14 @@ class RSIControllerTest {
 
     @Test
     void testGetRSI_WithException_Returns500() {
-        // Arrange
         String symbol = "AAPL";
         String timeframe = "1d";
 
         when(technicalIndicatorService.calculateRSIForTimeframe(symbol.toUpperCase(), timeframe))
             .thenThrow(new RuntimeException("Service error"));
 
-        // Act
         ResponseEntity<Map<String, Object>> response = rsiController.getRSI(symbol, timeframe);
 
-        // Assert
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertNotNull(response.getBody());
         assertNotNull(response.getBody().get("error"));
@@ -96,25 +93,21 @@ class RSIControllerTest {
 
     @Test
     void testGetRSI_WithDefaultTimeframe_Uses1d() {
-        // Arrange
         String symbol = "AAPL";
-        String defaultTimeframe = "1d"; // Default value
+        String defaultTimeframe = "1d";
         BigDecimal expectedRSI = BigDecimal.valueOf(50.0);
 
         when(technicalIndicatorService.calculateRSIForTimeframe(symbol.toUpperCase(), defaultTimeframe))
             .thenReturn(expectedRSI);
 
-        // Act
         ResponseEntity<Map<String, Object>> response = rsiController.getRSI(symbol, defaultTimeframe);
 
-        // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(defaultTimeframe, response.getBody().get("timeframe"));
     }
 
     @Test
     void testGetRSI_WithDifferentTimeframes_HandlesAll() {
-        // Arrange
         String symbol = "AAPL";
         String[] timeframes = {"1h", "30m", "2h", "1d"};
         BigDecimal mockRSI = BigDecimal.valueOf(45.0);
@@ -123,10 +116,8 @@ class RSIControllerTest {
             when(technicalIndicatorService.calculateRSIForTimeframe(symbol.toUpperCase(), timeframe))
                 .thenReturn(mockRSI);
 
-            // Act
             ResponseEntity<Map<String, Object>> response = rsiController.getRSI(symbol, timeframe);
 
-            // Assert
             assertEquals(HttpStatus.OK, response.getStatusCode());
             assertEquals(timeframe, response.getBody().get("timeframe"));
         }
@@ -134,19 +125,32 @@ class RSIControllerTest {
 
     @Test
     void testGetRSI_WithLowerCaseSymbol_ConvertsToUpperCase() {
-        // Arrange
-        String symbol = "aapl"; // Lowercase
+        String symbol = "aapl";
         String timeframe = "1d";
         BigDecimal expectedRSI = BigDecimal.valueOf(50.0);
 
         when(technicalIndicatorService.calculateRSIForTimeframe("AAPL", timeframe))
             .thenReturn(expectedRSI);
 
-        // Act
         ResponseEntity<Map<String, Object>> response = rsiController.getRSI(symbol, timeframe);
 
-        // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("AAPL", response.getBody().get("symbol")); // Should be uppercase
+        assertEquals("AAPL", response.getBody().get("symbol"));
+    }
+
+    @Test
+    void testGetRSI_WhenRepositoryHasValue_ReturnsFromDb() {
+        String symbol = "AAPL";
+        String timeframe = "1d";
+        BigDecimal storedRSI = BigDecimal.valueOf(55.0);
+
+        when(technicalIndicatorRepository.getLatestRSIForTimeframe(symbol.toUpperCase(), timeframe))
+            .thenReturn(storedRSI);
+
+        ResponseEntity<Map<String, Object>> response = rsiController.getRSI(symbol, timeframe);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(storedRSI.doubleValue(), (Double) response.getBody().get("rsi"), 0.01);
+        verify(technicalIndicatorService, never()).calculateRSIForTimeframe(anyString(), anyString());
     }
 }
