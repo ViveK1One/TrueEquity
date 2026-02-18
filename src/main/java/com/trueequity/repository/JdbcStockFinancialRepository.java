@@ -112,12 +112,26 @@ public class JdbcStockFinancialRepository {
             data.sharesOutstanding(),
             data.floatShares()
         );
+        // Remove any placeholder rows (no revenue) for this symbol so they don't shadow the real row
+        deletePlaceholderRows(data.symbol());
+    }
+
+    /**
+     * Delete rows for the symbol that have no revenue (placeholders), so "latest" queries return the real row.
+     */
+    public void deletePlaceholderRows(String symbol) {
+        jdbcTemplate.update(
+            "DELETE FROM stock_financials WHERE symbol = ? AND revenue IS NULL",
+            symbol.toUpperCase()
+        );
     }
 
     /**
      * Get latest financial data for a symbol
      */
     public Optional<FinancialData> findLatestBySymbol(String symbol) {
+        // Order by updated_at DESC so the most recently written row (with real data) is returned,
+        // not a stale row with a later period_end_date and nulls
         String sql = """
             SELECT id, symbol, period_type, period_end_date, fiscal_year, fiscal_quarter,
                    pe_ratio, peg_ratio, price_to_book, price_to_sales, ev_to_ebitda,
@@ -130,7 +144,7 @@ public class JdbcStockFinancialRepository {
                    shares_outstanding, float_shares
             FROM stock_financials
             WHERE symbol = ?
-            ORDER BY period_end_date DESC
+            ORDER BY updated_at DESC NULLS LAST
             LIMIT 1
             """;
         

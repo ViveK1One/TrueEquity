@@ -1,6 +1,6 @@
 package com.trueequity.config;
 
-import com.trueequity.api.provider.AlphaVantageProvider;
+import com.trueequity.api.provider.FinancialModelingPrepProvider;
 import com.trueequity.api.provider.DataProvider;
 import com.trueequity.api.provider.HybridDataProvider;
 import com.trueequity.api.provider.YahooFinanceProvider;
@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Primary;
 
 /**
  * Configuration for data providers
- * Uses Hybrid provider that combines Yahoo Finance (prices) + Alpha Vantage (fundamentals)
+ * Uses Hybrid provider that combines Yahoo Finance (prices) + Financial Modeling Prep (fundamentals)
  */
 @Configuration
 public class ProviderConfig {
@@ -21,7 +21,7 @@ public class ProviderConfig {
     private YahooFinanceProvider yahooFinanceProvider;
     
     @Autowired
-    private AlphaVantageProvider alphaVantageProvider;
+    private FinancialModelingPrepProvider fmpProvider;
 
     @Value("${app.data-provider.primary:hybrid}")
     private String primaryProvider;
@@ -30,10 +30,10 @@ public class ProviderConfig {
     @Primary
     public DataProvider primaryDataProvider() {
         return switch (primaryProvider.toLowerCase()) {
-            case "hybrid" -> new HybridDataProvider(yahooFinanceProvider, alphaVantageProvider);
+            case "hybrid" -> new HybridDataProvider(yahooFinanceProvider, fmpProvider);
             case "yahoo_finance", "yahoo" -> yahooFinanceProvider;
-            case "alpha_vantage", "alphavantage" -> alphaVantageProvider;
-            default -> new HybridDataProvider(yahooFinanceProvider, alphaVantageProvider);
+            case "fmp", "financial_modeling_prep" -> fmpProvider;
+            default -> new HybridDataProvider(yahooFinanceProvider, fmpProvider);
         };
     }
 }

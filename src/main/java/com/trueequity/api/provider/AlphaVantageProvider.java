@@ -30,39 +30,37 @@ import java.util.Optional;
 public class AlphaVantageProvider implements DataProvider {
 
     private static final String BASE_URL = "https://www.alphavantage.co/query";
-    private static final long DEFAULT_CALL_INTERVAL_MS = 15000L; // 4 calls/min to stay under 5/min limit
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final String apiKey;
-    private final long callIntervalMs;
-
+    
+    // Rate limiting: 5 calls/minute = 12 seconds between calls
     private long lastCallTime = 0;
+    private static final long MIN_CALL_INTERVAL_MS = 12000;
 
-    public AlphaVantageProvider(
-            @Value("${app.data-provider.alpha-vantage.api-key:}") String apiKey,
-            @Value("${app.data-provider.alpha-vantage.call-interval-ms:15000}") long callIntervalMs) {
+    public AlphaVantageProvider(@Value("${app.data-provider.alpha-vantage.api-key:}") String apiKey) {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         this.objectMapper = new ObjectMapper();
         this.apiKey = apiKey;
-        this.callIntervalMs = callIntervalMs > 0 ? callIntervalMs : DEFAULT_CALL_INTERVAL_MS;
     }
 
     /**
-     * Rate limit: wait so we stay under 5 calls/minute (default 15s = 4 calls/min).
+     * Rate limit: wait if needed to respect 5 calls/minute limit
      */
     private void waitForRateLimit() {
-        long now = System.currentTimeMillis();
-        long elapsed = now - lastCallTime;
-        if (elapsed < callIntervalMs) {
-            long sleepMs = callIntervalMs - elapsed;
+        long currentTime = System.currentTimeMillis();
+        long timeSinceLastCall = currentTime - lastCallTime;
+        
+        if (timeSinceLastCall < MIN_CALL_INTERVAL_MS) {
             try {
-                Thread.sleep(sleepMs);
+                Thread.sleep(MIN_CALL_INTERVAL_MS - timeSinceLastCall);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }
+        
         lastCallTime = System.currentTimeMillis();
     }
 
@@ -179,65 +177,134 @@ public class AlphaVantageProvider implements DataProvider {
         }
     }
 
-    /**
-     * Execute one Alpha Vantage GET request with rate-limit wait and one retry on "Note".
-     */
-    private Optional<JsonNode> fetchWithRateLimit(String url) {
-        for (int attempt = 0; attempt < 2; attempt++) {
-            try {
-                waitForRateLimit();
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .header("User-Agent", "Mozilla/5.0")
-                        .timeout(Duration.ofSeconds(30))
-                        .GET()
-                        .build();
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() != 200) return Optional.empty();
-                JsonNode root = objectMapper.readTree(response.body());
-                if (root.has("Error Message")) {
-                    System.out.println("Alpha Vantage error: " + root.get("Error Message").asText());
-                    return Optional.empty();
-                }
-                if (root.has("Note") && root.get("Note").asText().contains("API call frequency")) {
-                    if (attempt == 0) {
-                        System.out.println("Alpha Vantage rate limit hit, waiting 65s then retrying once...");
-                        Thread.sleep(65000);
-                        lastCallTime = System.currentTimeMillis();
-                        continue;
-                    }
-                    return Optional.empty();
-                }
-                return Optional.of(root);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return Optional.empty();
-            } catch (Exception e) {
-                System.out.println("Alpha Vantage request failed: " + e.getMessage());
+    private Optional<JsonNode> fetchIncomeStatement(String symbol) {
+        try {
+            String url = BASE_URL + "?function=INCOME_STATEMENT&symbol=" + symbol + "&apikey=" + apiKey;
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", "Mozilla/5.0")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() != 200) {
                 return Optional.empty();
             }
-        }
-        return Optional.empty();
-    }
 
-    private Optional<JsonNode> fetchIncomeStatement(String symbol) {
-        String url = BASE_URL + "?function=INCOME_STATEMENT&symbol=" + symbol + "&apikey=" + apiKey;
-        return fetchWithRateLimit(url);
+            JsonNode root = objectMapper.readTree(response.body());
+            
+            // Check for rate limit message
+            if (root.has("Note") && root.get("Note").asText().contains("API call frequency")) {
+                System.out.println("Alpha Vantage rate limit reached, waiting...");
+                Thread.sleep(60000); // Wait 1 minute
+                return Optional.empty();
+            }
+            
+            // Check for error
+            if (root.has("Error Message")) {
+                System.out.println("Alpha Vantage error: " + root.get("Error Message").asText());
+                return Optional.empty();
+            }
+            
+            return Optional.of(root);
+            
+        } catch (Exception e) {
+            System.out.println("Error fetching income statement: " + e.getMessage());
+            return Optional.empty();
+        }
     }
 
     private Optional<JsonNode> fetchBalanceSheet(String symbol) {
-        String url = BASE_URL + "?function=BALANCE_SHEET&symbol=" + symbol + "&apikey=" + apiKey;
-        return fetchWithRateLimit(url);
+        try {
+            String url = BASE_URL + "?function=BALANCE_SHEET&symbol=" + symbol + "&apikey=" + apiKey;
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", "Mozilla/5.0")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() != 200) {
+                return Optional.empty();
+            }
+
+            JsonNode root = objectMapper.readTree(response.body());
+            
+            if (root.has("Note") || root.has("Error Message")) {
+                return Optional.empty();
+            }
+            
+            return Optional.of(root);
+            
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     private Optional<JsonNode> fetchCashFlow(String symbol) {
-        String url = BASE_URL + "?function=CASH_FLOW&symbol=" + symbol + "&apikey=" + apiKey;
-        return fetchWithRateLimit(url);
+        try {
+            String url = BASE_URL + "?function=CASH_FLOW&symbol=" + symbol + "&apikey=" + apiKey;
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", "Mozilla/5.0")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() != 200) {
+                return Optional.empty();
+            }
+
+            JsonNode root = objectMapper.readTree(response.body());
+            
+            if (root.has("Note") || root.has("Error Message")) {
+                return Optional.empty();
+            }
+            
+            return Optional.of(root);
+            
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     private Optional<JsonNode> fetchOverview(String symbol) {
-        String url = BASE_URL + "?function=OVERVIEW&symbol=" + symbol + "&apikey=" + apiKey;
-        return fetchWithRateLimit(url);
+        try {
+            String url = BASE_URL + "?function=OVERVIEW&symbol=" + symbol + "&apikey=" + apiKey;
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", "Mozilla/5.0")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() != 200) {
+                return Optional.empty();
+            }
+
+            JsonNode root = objectMapper.readTree(response.body());
+            
+            if (root.has("Note") || root.has("Error Message")) {
+                return Optional.empty();
+            }
+            
+            return Optional.of(root);
+            
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     private StockFundamentalDTO buildFundamentalDTO(String symbol, JsonNode incomeStatement, 

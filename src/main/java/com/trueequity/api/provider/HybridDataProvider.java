@@ -13,40 +13,40 @@ import java.util.Optional;
 /**
  * Hybrid data provider that uses:
  * - Yahoo Finance for prices and basic info (fast, no rate limits)
- * - Alpha Vantage for comprehensive financial data (reliable fundamentals)
+ * - Financial Modeling Prep (FMP) for comprehensive financial data (250 requests/day)
  */
 @Component
 public class HybridDataProvider implements DataProvider {
 
     private final YahooFinanceProvider yahooFinanceProvider;
-    private final AlphaVantageProvider alphaVantageProvider;
+    private final FinancialModelingPrepProvider fmpProvider;
 
     public HybridDataProvider(YahooFinanceProvider yahooFinanceProvider, 
-                             AlphaVantageProvider alphaVantageProvider) {
+                             FinancialModelingPrepProvider fmpProvider) {
         this.yahooFinanceProvider = yahooFinanceProvider;
-        this.alphaVantageProvider = alphaVantageProvider;
+        this.fmpProvider = fmpProvider;
     }
 
     @Override
     public Optional<StockInfoDTO> getStockInfo(String symbol) {
-        // Use Alpha Vantage as primary source for sector, industry, market cap
-        // Use Yahoo Finance only for name and exchange if Alpha Vantage doesn't have them
-        Optional<StockInfoDTO> alphaInfo = alphaVantageProvider.getStockInfo(symbol);
+        // Use FMP as primary source for sector, industry, market cap
+        // Use Yahoo Finance only for name and exchange if FMP doesn't have them
+        Optional<StockInfoDTO> fmpInfo = fmpProvider.getStockInfo(symbol);
         
-        if (alphaInfo.isPresent()) {
-            StockInfoDTO info = alphaInfo.get();
+        if (fmpInfo.isPresent()) {
+            StockInfoDTO info = fmpInfo.get();
             
-            // If Alpha Vantage has name and exchange, use it directly
+            // If FMP has name and exchange, use it directly
             if (info.getName() != null && !info.getName().isEmpty() && 
                 info.getExchange() != null && !info.getExchange().isEmpty()) {
                 return Optional.of(info);
             }
             
-            // If Alpha Vantage doesn't have name/exchange, try Yahoo Finance
+            // If FMP doesn't have name/exchange, try Yahoo Finance
             Optional<StockInfoDTO> yahooInfo = yahooFinanceProvider.getStockInfo(symbol);
             if (yahooInfo.isPresent()) {
                 StockInfoDTO yahoo = yahooInfo.get();
-                // Fill in name and exchange from Yahoo, keep sector/industry/market cap from Alpha Vantage
+                // Fill in name and exchange from Yahoo, keep sector/industry/market cap from FMP
                 if ((info.getName() == null || info.getName().isEmpty()) && 
                     yahoo.getName() != null && !yahoo.getName().isEmpty()) {
                     info.setName(yahoo.getName());
@@ -60,7 +60,7 @@ public class HybridDataProvider implements DataProvider {
             return Optional.of(info);
         }
         
-        // Fallback to Yahoo Finance if Alpha Vantage completely fails
+        // Fallback to Yahoo Finance if FMP completely fails
         return yahooFinanceProvider.getStockInfo(symbol);
     }
 
@@ -78,12 +78,12 @@ public class HybridDataProvider implements DataProvider {
 
     @Override
     public Optional<StockFundamentalDTO> getFundamentals(String symbol) {
-        // Use Alpha Vantage for comprehensive financial data
-        // If Alpha Vantage fails, fallback to Yahoo Finance (limited data)
-        Optional<StockFundamentalDTO> alphaVantageData = alphaVantageProvider.getFundamentals(symbol);
+        // Use FMP for comprehensive financial data
+        // If FMP fails, fallback to Yahoo Finance (limited data)
+        Optional<StockFundamentalDTO> fmpData = fmpProvider.getFundamentals(symbol);
         
-        if (alphaVantageData.isPresent()) {
-            StockFundamentalDTO dto = alphaVantageData.get();
+        if (fmpData.isPresent()) {
+            StockFundamentalDTO dto = fmpData.get();
             
             // Try to get PE, EPS, shares from Yahoo Finance to fill in gaps
             Optional<StockFundamentalDTO> yahooData = yahooFinanceProvider.getFundamentals(symbol);
@@ -108,18 +108,18 @@ public class HybridDataProvider implements DataProvider {
             return Optional.of(dto);
         }
         
-        // Fallback to Yahoo Finance if Alpha Vantage is not available
+        // Fallback to Yahoo Finance if FMP is not available
         return yahooFinanceProvider.getFundamentals(symbol);
     }
 
     @Override
     public String getProviderName() {
-        return "Hybrid (Yahoo Finance + Alpha Vantage)";
+        return "Hybrid (Yahoo Finance + FMP)";
     }
 
     @Override
     public boolean isAvailable() {
-        return yahooFinanceProvider.isAvailable() || alphaVantageProvider.isAvailable();
+        return yahooFinanceProvider.isAvailable() || fmpProvider.isAvailable();
     }
 }
 

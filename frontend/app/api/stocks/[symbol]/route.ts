@@ -43,11 +43,11 @@ export async function GET(
       volume: parseFloat(priceResult.rows[0].volume) || 0,
     } : null;
 
-    // Fetch latest financial data
+    // Fetch latest financial data (by updated_at so we get the row with real data, not a stale placeholder)
     const financialResult = await pool.query(
       `SELECT * FROM stock_financials 
        WHERE symbol = $1 
-       ORDER BY period_end_date DESC 
+       ORDER BY updated_at DESC NULLS LAST 
        LIMIT 1`,
       [symbol]
     );

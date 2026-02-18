@@ -41,3 +41,6 @@ Thumbs.db
 *.war
 *.ear
 
+# Docs (assignment/guideline PDFs - keep local only)
+docs/*.pdf
+

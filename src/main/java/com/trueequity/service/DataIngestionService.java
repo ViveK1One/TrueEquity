@@ -77,25 +77,27 @@ public class DataIngestionService {
      * Ingest or update stock basic information
      * 
      * Logic:
-     * - First time: INSERT new stock (if not exists)
-     * - Next times: UPDATE existing stock (if exists)
-     * - Uses ON CONFLICT DO UPDATE in database (upsert)
-     * - Smart update: Only updates if last update was > 7 days ago (unless force=true)
+     * - Skip if already updated today (no duplicate full run same day).
+     * - Skip API call when stock already has static data (sector, industry, exchange, name) to save FMP calls.
+     * - Only call API when stock is new or missing static data.
      */
     public void ingestStockInfo(String symbol, boolean force) {
         try {
+            // Skip "already updated today" only when we already have full static data (no gaps to fill)
             if (!force) {
                 LocalDateTime lastUpdated = stockRepository.getLastUpdated(symbol);
-                if (lastUpdated != null) {
-                    long daysSinceUpdate = java.time.Duration.between(lastUpdated, LocalDateTime.now()).toDays();
-                    if (daysSinceUpdate < 7) {
-                        log("Skipping stock info update for " + symbol + " - last updated " + daysSinceUpdate + " days ago (threshold: 7 days)");
-                        return;
-                    }
+                boolean hasStatic = stockRepository.exists(symbol) && stockRepository.hasStaticData(symbol);
+                if (lastUpdated != null && lastUpdated.toLocalDate().equals(LocalDate.now()) && hasStatic) {
+                    log("Skipping stock info for " + symbol + " - already updated today and static data present");
+                    return;
                 }
             }
 
-            log("Fetching stock info for: " + symbol);
+            // Always fetch stock info to update market cap (changes with price)
+            // But skip updating static fields (sector, industry, exchange, name) if they already exist
+            boolean hasStaticData = stockRepository.exists(symbol) && stockRepository.hasStaticData(symbol);
+            
+            log("Fetching stock info for: " + symbol + (hasStaticData ? " (updating market cap only)" : ""));
             
             Optional<StockInfoDTO> infoOpt = dataProvider.getStockInfo(symbol);
             if (infoOpt.isEmpty()) {
@@ -117,6 +119,15 @@ public class DataIngestionService {
             }
 
             StockInfoDTO info = infoOpt.get();
+            
+            // If static data exists, only update market cap (it changes with price)
+            if (hasStaticData) {
+                if (info.getMarketCap() != null && info.getMarketCap() > 0) {
+                    stockRepository.updateMarketCap(symbol, info.getMarketCap());
+                    log("Updated market cap for " + symbol + ": " + formatMarketCap(info.getMarketCap()));
+                }
+                return;
+            }
             
             // Validate - don't insert if name is null or empty
             if (info.getName() == null || info.getName().isEmpty() || info.getName().equals("null")) {
@@ -241,13 +252,12 @@ public class DataIngestionService {
     }
 
     /**
-     * Ingest fundamental data (includes EPS)
+     * Ingest fundamental data (includes EPS and ratios)
      * 
      * Logic:
      * - First time: INSERT new financial data
      * - Next times: UPDATE existing financial data (same period)
-     * - Uses ON CONFLICT DO UPDATE in database (upsert)
-     * - Smart update: Only updates if last update was > 12 hours ago (unless force=true)
+     * - Skip if already updated today (no duplicate full run same day; next run = next day or force).
      */
     public void ingestFundamentals(String symbol, boolean force) {
         try {
@@ -266,12 +276,9 @@ public class DataIngestionService {
 
             if (!force) {
                 LocalDateTime lastUpdated = stockFinancialRepository.getLastUpdated(symbol);
-                if (lastUpdated != null) {
-                    long hoursSinceUpdate = java.time.Duration.between(lastUpdated, LocalDateTime.now()).toHours();
-                    if (hoursSinceUpdate < 12) {
-                        log("Skipping fundamentals update for " + symbol + " - last updated " + hoursSinceUpdate + " hours ago (threshold: 12 hours)");
-                        return;
-                    }
+                if (lastUpdated != null && lastUpdated.toLocalDate().equals(LocalDate.now())) {
+                    log("Skipping fundamentals for " + symbol + " - already updated today");
+                    return;
                 }
             }
 
@@ -279,7 +286,7 @@ public class DataIngestionService {
             
             Optional<StockFundamentalDTO> fundamentalOpt = dataProvider.getFundamentals(symbol);
             if (fundamentalOpt.isEmpty()) {
-                log("No fundamental data found for: " + symbol);
+                log("No fundamental data found for: " + symbol + " (check FMP rate limit, API key, or network)");
                 return;
             }
 

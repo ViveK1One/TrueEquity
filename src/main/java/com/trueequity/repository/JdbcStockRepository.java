@@ -87,5 +87,32 @@ public class JdbcStockRepository {
             return null;
         }
     }
+
+    /**
+     * Returns true if stock has static data (sector, industry, exchange, name) already filled.
+     * Used to avoid wasting API calls on profile when only price/ratios need updating.
+     */
+    public boolean hasStaticData(String symbol) {
+        String sql = "SELECT (sector IS NOT NULL AND TRIM(sector) != '') AND (industry IS NOT NULL AND TRIM(industry) != '') " +
+                     "AND (exchange IS NOT NULL AND TRIM(exchange) != '') AND (name IS NOT NULL AND TRIM(name) != '') " +
+                     "FROM stocks WHERE symbol = ?";
+        try {
+            Boolean result = jdbcTemplate.queryForObject(sql, Boolean.class, symbol.toUpperCase());
+            return Boolean.TRUE.equals(result);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Update market cap for an existing stock (market cap changes with price, so needs regular updates)
+     */
+    public void updateMarketCap(String symbol, Long marketCap) {
+        if (marketCap == null || marketCap <= 0) {
+            return; // Don't update with invalid values
+        }
+        String sql = "UPDATE stocks SET market_cap = ?, updated_at = CURRENT_TIMESTAMP WHERE symbol = ?";
+        jdbcTemplate.update(sql, marketCap, symbol.toUpperCase());
+    }
 }
 
