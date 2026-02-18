@@ -66,26 +66,35 @@ public class DataIngestionService {
     }
 
     /**
+     * Ingest or update stock basic information.
+     * When {@code force} is true (e.g. initial boot run), skips the "last updated" check and always fetches.
+     */
+    public void ingestStockInfo(String symbol) {
+        ingestStockInfo(symbol, false);
+    }
+
+    /**
      * Ingest or update stock basic information
      * 
      * Logic:
      * - First time: INSERT new stock (if not exists)
      * - Next times: UPDATE existing stock (if exists)
      * - Uses ON CONFLICT DO UPDATE in database (upsert)
-     * - Smart update: Only updates if last update was > 7 days ago
+     * - Smart update: Only updates if last update was > 7 days ago (unless force=true)
      */
-    public void ingestStockInfo(String symbol) {
+    public void ingestStockInfo(String symbol, boolean force) {
         try {
-            // Check last update date - skip if updated within last 7 days
-            LocalDateTime lastUpdated = stockRepository.getLastUpdated(symbol);
-            if (lastUpdated != null) {
-                long daysSinceUpdate = java.time.Duration.between(lastUpdated, LocalDateTime.now()).toDays();
-                if (daysSinceUpdate < 7) {
-                    log("Skipping stock info update for " + symbol + " - last updated " + daysSinceUpdate + " days ago (threshold: 7 days)");
-                    return;
+            if (!force) {
+                LocalDateTime lastUpdated = stockRepository.getLastUpdated(symbol);
+                if (lastUpdated != null) {
+                    long daysSinceUpdate = java.time.Duration.between(lastUpdated, LocalDateTime.now()).toDays();
+                    if (daysSinceUpdate < 7) {
+                        log("Skipping stock info update for " + symbol + " - last updated " + daysSinceUpdate + " days ago (threshold: 7 days)");
+                        return;
+                    }
                 }
             }
-            
+
             log("Fetching stock info for: " + symbol);
             
             Optional<StockInfoDTO> infoOpt = dataProvider.getStockInfo(symbol);
@@ -224,15 +233,23 @@ public class DataIngestionService {
     }
 
     /**
+     * Ingest fundamental data (includes EPS).
+     * When {@code force} is true (e.g. initial boot run), skips the "last updated" check and always fetches.
+     */
+    public void ingestFundamentals(String symbol) {
+        ingestFundamentals(symbol, false);
+    }
+
+    /**
      * Ingest fundamental data (includes EPS)
      * 
      * Logic:
      * - First time: INSERT new financial data
      * - Next times: UPDATE existing financial data (same period)
      * - Uses ON CONFLICT DO UPDATE in database (upsert)
-     * - Smart update: Only updates if last update was > 12 hours ago (reduced for EPS availability)
+     * - Smart update: Only updates if last update was > 12 hours ago (unless force=true)
      */
-    public void ingestFundamentals(String symbol) {
+    public void ingestFundamentals(String symbol, boolean force) {
         try {
             // Ensure stock exists in stocks table first (to avoid foreign key constraint)
             if (!stockRepository.exists(symbol)) {
@@ -246,18 +263,18 @@ public class DataIngestionService {
                     null
                 );
             }
-            
-            // Smart update check: Only update if last update was > 12 hours ago
-            // This ensures EPS is updated frequently (every 12 hours) but avoids unnecessary API calls
-            LocalDateTime lastUpdated = stockFinancialRepository.getLastUpdated(symbol);
-            if (lastUpdated != null) {
-                long hoursSinceUpdate = java.time.Duration.between(lastUpdated, LocalDateTime.now()).toHours();
-                if (hoursSinceUpdate < 12) {
-                    log("Skipping fundamentals update for " + symbol + " - last updated " + hoursSinceUpdate + " hours ago (threshold: 12 hours)");
-                    return;
+
+            if (!force) {
+                LocalDateTime lastUpdated = stockFinancialRepository.getLastUpdated(symbol);
+                if (lastUpdated != null) {
+                    long hoursSinceUpdate = java.time.Duration.between(lastUpdated, LocalDateTime.now()).toHours();
+                    if (hoursSinceUpdate < 12) {
+                        log("Skipping fundamentals update for " + symbol + " - last updated " + hoursSinceUpdate + " hours ago (threshold: 12 hours)");
+                        return;
+                    }
                 }
             }
-            
+
             log("Fetching fundamentals for: " + symbol + " (using " + dataProvider.getProviderName() + ")");
             
             Optional<StockFundamentalDTO> fundamentalOpt = dataProvider.getFundamentals(symbol);
@@ -331,38 +348,40 @@ public class DataIngestionService {
     }
 
     /**
+     * Recalculate and store scores for a stock.
+     * When {@code force} is true (e.g. initial boot run), skips the "last calculated" check and always recalculates.
+     */
+    public void calculateAndStoreScores(String symbol) {
+        calculateAndStoreScores(symbol, false);
+    }
+
+    /**
      * Recalculate and store scores for a stock
      * 
      * Logic:
      * - Calculates scores from financial data and prices
      * - Stores in stock_scores table (replaces old score)
+     * - Skips if calculated within last hour AND no new data (unless force=true)
      */
-    public void calculateAndStoreScores(String symbol) {
+    public void calculateAndStoreScores(String symbol, boolean force) {
         try {
-            // Score calculation is INDEPENDENT - it just reads from database
-            // Check last calculation date - skip if calculated within last hour AND no new data
-            LocalDateTime lastCalculated = stockScoreRepository.getLastCalculated(symbol);
-            LocalDateTime lastFinancialUpdate = stockFinancialRepository.getLastUpdated(symbol);
-            LocalDateTime lastPriceUpdate = stockPriceRepository.getLastPriceUpdate(symbol);
-            // Note: Technical indicators are checked separately, but we don't have direct access here
-            // The score calculation will work with available financial and price data
-            
-            if (lastCalculated != null) {
-                long hoursSinceCalculation = java.time.Duration.between(lastCalculated, LocalDateTime.now()).toHours();
-                
-                // Only skip if calculated recently AND no new data in any table
-                boolean hasNewFinancialData = lastFinancialUpdate != null && 
-                    lastCalculated.isBefore(lastFinancialUpdate);
-                boolean hasNewPriceData = lastPriceUpdate != null && 
-                    lastCalculated.isBefore(lastPriceUpdate);
-                // Note: Technical indicators update check removed - scores work with financial/price data
-                
-                if (hoursSinceCalculation < 1 && !hasNewFinancialData && !hasNewPriceData) {
-                    log("Skipping score calculation for " + symbol + " - last calculated " + hoursSinceCalculation + " hours ago and no new data");
-                    return;
+            if (!force) {
+                LocalDateTime lastCalculated = stockScoreRepository.getLastCalculated(symbol);
+                LocalDateTime lastFinancialUpdate = stockFinancialRepository.getLastUpdated(symbol);
+                LocalDateTime lastPriceUpdate = stockPriceRepository.getLastPriceUpdate(symbol);
+
+                if (lastCalculated != null) {
+                    long hoursSinceCalculation = java.time.Duration.between(lastCalculated, LocalDateTime.now()).toHours();
+                    boolean hasNewFinancialData = lastFinancialUpdate != null && lastCalculated.isBefore(lastFinancialUpdate);
+                    boolean hasNewPriceData = lastPriceUpdate != null && lastCalculated.isBefore(lastPriceUpdate);
+
+                    if (hoursSinceCalculation < 1 && !hasNewFinancialData && !hasNewPriceData) {
+                        log("Skipping score calculation for " + symbol + " - last calculated " + hoursSinceCalculation + " hours ago and no new data");
+                        return;
+                    }
                 }
             }
-            
+
             log("Calculating scores for: " + symbol);
             
             Optional<JdbcStockScoreRepository.ScoreData> scoreOpt = 

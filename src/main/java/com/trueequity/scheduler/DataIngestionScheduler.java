@@ -103,7 +103,8 @@ public class DataIngestionScheduler {
             try {
                 log("Processing stock: " + symbol);
 
-                dataIngestionService.ingestStockInfo(symbol);
+                // Force full refresh on boot (no skip-by-threshold)
+                dataIngestionService.ingestStockInfo(symbol, true);
                 Thread.sleep(300);
 
                 LocalDate endDate = LocalDate.now();
@@ -114,10 +115,10 @@ public class DataIngestionScheduler {
                 technicalIndicatorService.calculateAndStoreRSI(symbol);
                 Thread.sleep(200);
 
-                dataIngestionService.ingestFundamentals(symbol);
+                dataIngestionService.ingestFundamentals(symbol, true);
                 Thread.sleep(300);
 
-                dataIngestionService.calculateAndStoreScores(symbol);
+                dataIngestionService.calculateAndStoreScores(symbol, true);
                 Thread.sleep(200);
 
                 successCount++;
