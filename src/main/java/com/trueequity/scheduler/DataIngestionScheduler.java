@@ -86,57 +86,63 @@ public class DataIngestionScheduler {
     }
     
     /**
-     * Initial data load job - runs once on startup
-     * Processes ALL stocks from configuration
-     * Fetches: stock info, prices, fundamentals, and calculates scores
+     * Initial data load job - runs once on startup, immediately (no delay).
+     * Processes ALL stocks from configuration.
+     * After this completes, the existing scheduled jobs (price, fundamentals, score) run at their normal times.
      */
-    @Scheduled(fixedDelay = Long.MAX_VALUE, initialDelay = 5000)
+    @Scheduled(fixedDelay = Long.MAX_VALUE, initialDelay = 0)
     public void initialDataLoadOnStartup() {
-        log("Starting initial data load for all stocks...");
+        log("Starting immediate data load for all stocks (runs once on boot)...");
         List<String> symbols = getStockSymbols();
         log("Total stocks to process: " + symbols.size());
-        
+
         int successCount = 0;
         int failCount = 0;
-        
+
         for (String symbol : symbols) {
             try {
                 log("Processing stock: " + symbol);
-                
-                // 1. Fetch and store stock info
+
                 dataIngestionService.ingestStockInfo(symbol);
                 Thread.sleep(300);
-                
-                // 2. Fetch and store historical prices (last 60 days) - includes Volume
-                // Fetching 60 days ensures we have enough trading days for RSI (need 14+ trading days)
+
                 LocalDate endDate = LocalDate.now();
                 LocalDate startDate = endDate.minusDays(60);
                 dataIngestionService.ingestHistoricalPrices(symbol, startDate, endDate);
                 Thread.sleep(300);
-                
-                // 3. Calculate and store RSI (critical for trading strategies)
+
                 technicalIndicatorService.calculateAndStoreRSI(symbol);
                 Thread.sleep(200);
-                
-                // 4. Fetch and store fundamentals (includes EPS)
+
                 dataIngestionService.ingestFundamentals(symbol);
                 Thread.sleep(300);
-                
-                // 5. Calculate and store scores (INDEPENDENT - reads from database)
-                // Score calculation doesn't depend on insertion timing, it just reads existing data
+
                 dataIngestionService.calculateAndStoreScores(symbol);
                 Thread.sleep(200);
-                
+
                 successCount++;
                 log("Completed processing: " + symbol);
-                
+
             } catch (Exception e) {
                 log("Failed to process " + symbol + ": " + e.getMessage());
                 failCount++;
             }
         }
-        
+
         log("Initial data load completed: " + successCount + " succeeded, " + failCount + " failed");
+        log("Next runs will follow the existing schedule (see below).");
+
+        ZonedDateTime nowEST = ZonedDateTime.now(ZoneId.of("America/New_York"));
+        ZonedDateTime nextPrice = calculateNextPriceUpdate(nowEST);
+        ZonedDateTime nextFundamentals = calculateNextFundamentalsUpdate(nowEST);
+        // Score job uses cron without zone → server default; show next full hour in server time
+        ZonedDateTime nowServer = ZonedDateTime.now();
+        ZonedDateTime nextScore = nowServer.withMinute(0).withSecond(0).withNano(0);
+        if (!nextScore.isAfter(nowServer)) nextScore = nextScore.plusHours(1);
+
+        log("Next price update (15 min during market hours): " + nextPrice.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")));
+        log("Next fundamentals update (daily 6 PM EST):        " + nextFundamentals.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")));
+        log("Next score recalculation (hourly):               " + nextScore.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")));
     }
     
     @EventListener(ApplicationReadyEvent.class)

@@ -277,6 +277,15 @@ public class TechnicalIndicatorService {
         }
     }
 
+    /** Yahoo uses ticker symbols; map common name-based or wrong symbols to correct ticker. */
+    private static String normalizeSymbolForYahoo(String symbol) {
+        if (symbol == null) return symbol;
+        switch (symbol.toUpperCase()) {
+            case "ADOBE": return "ADBE";
+            default: return symbol;
+        }
+    }
+
     /**
      * Calculate RSI for different timeframes to match TradingView
      * @param symbol Stock symbol
@@ -285,6 +294,7 @@ public class TechnicalIndicatorService {
      */
     public BigDecimal calculateRSIForTimeframe(String symbol, String timeframe) {
         try {
+            symbol = normalizeSymbolForYahoo(symbol);
             java.time.LocalDateTime endTime = java.time.LocalDateTime.now();
             java.time.LocalDateTime startTime;
             String interval;
@@ -297,9 +307,9 @@ public class TechnicalIndicatorService {
                     startTime = endTime.minusDays(60); // Max 60 days for intraday
                     interval = "60m"; // Use 60m instead of 1h for better compatibility
                     break;
-                case "30m": // For 1M view (30-minute intervals)
-                    startTime = endTime.minusDays(60); // Max 60 days for intraday
-                    interval = "30m";
+                case "30m": // For 1M view - use daily data (Yahoo often returns 422 for 30m over long range)
+                    startTime = endTime.minusDays(30);
+                    interval = "1d";
                     break;
                 case "2h": // For 6M view (2-hour intervals) - Yahoo doesn't support 2h, use 1h instead
                     startTime = endTime.minusDays(60); // Max 60 days for intraday
