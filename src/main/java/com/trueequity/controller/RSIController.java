@@ -1,11 +1,13 @@
 package com.trueequity.controller;
 
+import com.trueequity.repository.JdbcTechnicalIndicatorRepository;
 import com.trueequity.service.TechnicalIndicatorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -45,10 +47,13 @@ import java.util.Map;
 public class RSIController {
 
     private final TechnicalIndicatorService technicalIndicatorService;
+    private final JdbcTechnicalIndicatorRepository technicalIndicatorRepository;
 
     @Autowired
-    public RSIController(TechnicalIndicatorService technicalIndicatorService) {
+    public RSIController(TechnicalIndicatorService technicalIndicatorService,
+                         JdbcTechnicalIndicatorRepository technicalIndicatorRepository) {
         this.technicalIndicatorService = technicalIndicatorService;
+        this.technicalIndicatorRepository = technicalIndicatorRepository;
     }
 
     /**
@@ -75,23 +80,32 @@ public class RSIController {
             @RequestParam(defaultValue = "1d") String timeframe) {
         
         Map<String, Object> response = new HashMap<>();
-        
+        String sym = symbol.toUpperCase();
+        String tf = (timeframe != null && !timeframe.isEmpty()) ? timeframe : "1d";
+
         try {
-            BigDecimal rsi = technicalIndicatorService.calculateRSIForTimeframe(symbol.toUpperCase(), timeframe);
-            
+            // 1) Read from DB first (pre-computed for 1h, 30m, 2h, 1d)
+            BigDecimal rsi = technicalIndicatorRepository.getLatestRSIForTimeframe(sym, tf);
             if (rsi != null) {
                 response.put("rsi", rsi.doubleValue());
-                response.put("timeframe", timeframe);
-                response.put("symbol", symbol.toUpperCase());
-                return ResponseEntity.ok(response);
-            } else {
-                response.put("error", "Could not calculate RSI for " + symbol + " with timeframe " + timeframe + ". This may be due to insufficient data or market being closed.");
-                response.put("rsi", null);
-                response.put("timeframe", timeframe);
-                response.put("symbol", symbol.toUpperCase());
-                // Return 200 with null RSI instead of 404, so frontend can handle it gracefully
+                response.put("timeframe", tf);
+                response.put("symbol", sym);
                 return ResponseEntity.ok(response);
             }
+            // 2) Fallback: compute on-demand and store for next time
+            rsi = technicalIndicatorService.calculateRSIForTimeframe(sym, tf);
+            if (rsi != null) {
+                technicalIndicatorRepository.upsertRSI(sym, LocalDate.now(), tf, rsi);
+                response.put("rsi", rsi.doubleValue());
+                response.put("timeframe", tf);
+                response.put("symbol", sym);
+                return ResponseEntity.ok(response);
+            }
+            response.put("error", "Could not get or calculate RSI for " + symbol + " with timeframe " + tf + ". This may be due to insufficient data or market being closed.");
+            response.put("rsi", null);
+            response.put("timeframe", tf);
+            response.put("symbol", sym);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("error", e.getMessage());
             return ResponseEntity.status(500).body(response);

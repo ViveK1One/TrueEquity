@@ -118,7 +118,7 @@ export async function GET(
     // Fetch latest technical indicator (RSI)
     const technicalResult = await pool.query(
       `SELECT * FROM technical_indicators 
-       WHERE symbol = $1 
+       WHERE symbol = $1 AND timeframe = '1d'
        ORDER BY date DESC 
        LIMIT 1`,
       [symbol]

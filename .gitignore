@@ -44,3 +44,6 @@ Thumbs.db
 # Docs (assignment/guideline PDFs - keep local only)
 docs/*.pdf
 
+# Slide content (presentation drafts - keep local only)
+slide content/
+

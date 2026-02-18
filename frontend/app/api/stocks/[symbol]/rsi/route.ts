@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import pool from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
@@ -7,12 +8,10 @@ export async function GET(
   try {
     const { symbol: symbolParam } = await params;
     const symbol = symbolParam.toUpperCase();
-    
-    // Get timeframe from query parameter (default to '1d' for daily)
+
     const { searchParams } = new URL(request.url);
     const timeframe = searchParams.get('timeframe') || '1d';
-    
-    // Valid timeframes: 1h, 30m, 2h, 1d
+
     const validTimeframes = ['1h', '30m', '2h', '1d'];
     if (!validTimeframes.includes(timeframe)) {
       return NextResponse.json(
@@ -20,44 +19,46 @@ export async function GET(
         { status: 400 }
       );
     }
-    
-    // Call Java backend to calculate RSI for the timeframe
-    // Note: This requires the Java backend to be running and accessible
+
+    // 1) Read from DB first (works when Java backend is stopped)
+    const dbResult = await pool.query(
+      `SELECT rsi FROM technical_indicators 
+       WHERE symbol = $1 AND timeframe = $2 AND rsi IS NOT NULL 
+       ORDER BY date DESC 
+       LIMIT 1`,
+      [symbol, timeframe]
+    );
+    if (dbResult.rows.length > 0 && dbResult.rows[0].rsi != null) {
+      const rsi = parseFloat(dbResult.rows[0].rsi);
+      return NextResponse.json({ rsi: Number.isFinite(rsi) ? rsi : null, timeframe, error: null });
+    }
+
+    // 2) Fallback: call Java backend when running (to compute and store for next time)
     const javaBackendUrl = process.env.JAVA_BACKEND_URL || 'http://localhost:8080';
-    
     try {
       const response = await fetch(
         `${javaBackendUrl}/api/rsi/${symbol}?timeframe=${timeframe}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          // Add timeout
-          signal: AbortSignal.timeout(10000), // 10 second timeout
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(10000),
         }
       );
-      
-      if (!response.ok) {
-        // Even if not OK, try to get error message
-        try {
-          const errorData = await response.json();
-          return NextResponse.json({ rsi: null, timeframe, error: errorData.error || 'Failed to calculate RSI' });
-        } catch {
-          return NextResponse.json({ rsi: null, timeframe, error: `Backend returned ${response.status}` });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.rsi != null) {
+          return NextResponse.json({ rsi: data.rsi, timeframe, error: data.error || null });
         }
       }
-      
-      const data = await response.json();
-      // Backend now returns 200 even if RSI is null, so check the rsi field
-      return NextResponse.json({ rsi: data.rsi, timeframe, error: data.error || null });
-      
-    } catch (error) {
-      console.error('Error calling Java backend for RSI:', error);
-      // Fallback: return null if Java backend is not available
-      return NextResponse.json({ rsi: null, timeframe, error: 'Backend service unavailable' });
+    } catch (err) {
+      console.error('Java backend unavailable for RSI:', err);
     }
-    
+
+    return NextResponse.json({
+      rsi: null,
+      timeframe,
+      error: 'No RSI in database. Run the Java ingestion app to populate RSI for all timeframes.',
+    });
   } catch (error) {
     console.error('Error fetching RSI:', error);
     return NextResponse.json(

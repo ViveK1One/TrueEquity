@@ -69,8 +69,8 @@ public class DataIngestionScheduler {
                 dataIngestionService.ingestLatestPrice(symbol);
                 Thread.sleep(100);
                 
-                // Calculate and store RSI (updates every 15 min like prices)
-                technicalIndicatorService.calculateAndStoreRSI(symbol);
+                // Calculate and store RSI for all timeframes (1h, 30m, 2h, 1d)
+                technicalIndicatorService.calculateAndStoreRSIForAllTimeframes(symbol);
                 Thread.sleep(50);
                 
                 // Update fundamentals (includes EPS) - updates every 15 min like prices
@@ -112,7 +112,7 @@ public class DataIngestionScheduler {
                 dataIngestionService.ingestHistoricalPrices(symbol, startDate, endDate);
                 Thread.sleep(300);
 
-                technicalIndicatorService.calculateAndStoreRSI(symbol);
+                technicalIndicatorService.calculateAndStoreRSIForAllTimeframes(symbol);
                 Thread.sleep(200);
 
                 dataIngestionService.ingestFundamentals(symbol, true);

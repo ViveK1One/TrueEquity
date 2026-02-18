@@ -100,12 +100,35 @@ public class TechnicalIndicatorService {
             BigDecimal rsi = calculateRSI(prices, 14);
             
             if (rsi != null) {
-                technicalIndicatorRepository.upsertRSI(symbol, endDate, rsi);
+                technicalIndicatorRepository.upsertRSI(symbol, endDate, JdbcTechnicalIndicatorRepository.TIMEFRAME_1D, rsi);
                 log("Calculated and stored RSI for " + symbol + ": " + rsi.setScale(2, RoundingMode.HALF_UP));
             }
             
         } catch (Exception e) {
             log("Error calculating RSI for " + symbol + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Calculates and stores RSI for all timeframes (1h, 30m, 2h, 1d) so the frontend can read from DB.
+     * Call this from the scheduler instead of only calculateAndStoreRSI.
+     */
+    public void calculateAndStoreRSIForAllTimeframes(String symbol) {
+        // 1d: use existing daily logic (from DB prices)
+        calculateAndStoreRSI(symbol);
+        // 1h, 30m, 2h: compute from Yahoo and store
+        String[] timeframes = { JdbcTechnicalIndicatorRepository.TIMEFRAME_1H, JdbcTechnicalIndicatorRepository.TIMEFRAME_30M, JdbcTechnicalIndicatorRepository.TIMEFRAME_2H };
+        LocalDate today = LocalDate.now();
+        for (String tf : timeframes) {
+            try {
+                BigDecimal rsi = calculateRSIForTimeframe(symbol, tf);
+                if (rsi != null) {
+                    technicalIndicatorRepository.upsertRSI(symbol, today, tf, rsi);
+                    log("Stored " + tf + " RSI for " + symbol + ": " + rsi.setScale(2, RoundingMode.HALF_UP));
+                }
+            } catch (Exception e) {
+                log("Error storing " + tf + " RSI for " + symbol + ": " + e.getMessage());
+            }
         }
     }
 
