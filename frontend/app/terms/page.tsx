@@ -25,7 +25,7 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p style={{ fontSize: '1rem', color: '#a3a3a3', textAlign: 'center', marginBottom: '3rem' }}>
-            Last Updated: January 2025
+            Last Updated: February 2026
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
