@@ -80,6 +80,11 @@ export async function GET(
         epsGrowthYoy: parseFloat(row.eps_growth_yoy) || null,
       } : null;
 
+      // Skip stocks with no meaningful data (no price or no score)
+      const hasPrice = row.current_price != null;
+      const hasScore = score != null && (score.overallScore ?? 0) > 0;
+      if (!hasPrice || !hasScore) continue;
+
       // Calculate recommendation
       const recommendation = calculateRecommendation(score, financial);
       
