@@ -322,25 +322,25 @@ public class TechnicalIndicatorService {
             java.time.LocalDateTime startTime;
             String interval;
             
-            // Set time range and interval based on timeframe
-            // Yahoo Finance supports: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
-            // Note: For intraday data, max range is 60 days
+            // Set time range and interval so each timeframe uses different bar size (distinct RSI values)
+            // Yahoo: 1m, 2m, 5m, 15m, 30m, 60m, 1d, 1wk, 1mo
+            // 1 Hour = 14-period RSI on hourly bars; 1 Month = daily; 6 Months = weekly; 1 Year = monthly
             switch (timeframe) {
-                case "1h":
-                    startTime = endTime.minusDays(60); // Max 60 days for intraday
-                    interval = "60m"; // Use 60m instead of 1h for better compatibility
+                case "1h": // 1 Hour – RSI(14) on hourly bars
+                    startTime = endTime.minusDays(60);
+                    interval = "60m";
                     break;
-                case "30m": // For 1M view - use daily data (Yahoo often returns 422 for 30m over long range)
+                case "30m": // 1 Month – RSI(14) on daily bars (last ~14 days)
                     startTime = endTime.minusDays(30);
                     interval = "1d";
                     break;
-                case "2h": // For 6M view (2-hour intervals) - Yahoo doesn't support 2h, use 1h instead
-                    startTime = endTime.minusDays(60); // Max 60 days for intraday
-                    interval = "60m"; // Use 1-hour candles for 6-month view
+                case "2h": // 6 Months – RSI(14) on weekly bars (last ~14 weeks)
+                    startTime = endTime.minusDays(120);
+                    interval = "1wk";
                     break;
-                case "1d": // For 1Y view (daily intervals)
-                    startTime = endTime.minusDays(365);
-                    interval = "1d";
+                case "1d": // 1 Year – RSI(14) on monthly bars (last ~14 months)
+                    startTime = endTime.minusDays(500);
+                    interval = "1mo";
                     break;
                 default:
                     log("Unsupported timeframe: " + timeframe);

@@ -148,8 +148,8 @@ export default function StocksPage() {
 
       <main style={{ paddingTop: '100px', paddingBottom: '4rem', minHeight: '100vh' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2rem' }}>
-          {/* Search Bar */}
-          <div style={{ marginBottom: '2rem' }}>
+          {/* Search Bar - stays on top; stacking context so dropdown popup appears above heading */}
+          <div style={{ marginBottom: '2rem', position: 'relative', zIndex: 50 }}>
             <div className="search-container" style={{ maxWidth: '600px', margin: '0 auto' }}>
               <SearchBar />
             </div>
@@ -166,9 +166,9 @@ export default function StocksPage() {
           </div>
 
           {/* Tabs */}
-          <div className="tabs-container" style={{ 
-            display: 'flex', 
-            gap: '0.5rem', 
+          <div className="tabs-container" style={{
+            display: 'flex',
+            gap: '0.5rem',
             marginBottom: '2rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             flexWrap: 'nowrap',
