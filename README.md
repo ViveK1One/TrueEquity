@@ -40,11 +40,11 @@ The backend runs independently and:
 
 ### Configuration
 
-Database connection (URL, username, password) is set in `src/main/resources/application.properties`, or via environment variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. No need to create a database or apply schema for evaluation—use the configured connection; data is served from this database.
+Database connection (URL, username, password) is set in `backend/main/resources/application.properties`, or via environment variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. No need to create a database or apply schema for evaluation—use the configured connection; data is served from this database.
 
 ### How to run the backend
 
-1. Open a terminal and go to the **project root folder** (the folder that contains `pom.xml` and the `src` folder).  
+1. Open a terminal and go to the **project root folder** (the folder that contains `pom.xml` and the `backend` folder).  
    Example: `cd C:\Users\vivek\Downloads\TrueEquity` (or the path where you have the project).
 
 2. Run:
@@ -54,7 +54,7 @@ mvn clean install
 mvn spring-boot:run
 ```
 
-This starts the application whose main class is **TrueEquityIngestionApplication** (file: `src/main/java/com/trueequity/TrueEquityIngestionApplication.java`). The backend runs on port 8080. Start it before the frontend.
+This starts the application whose main class is **TrueEquityIngestionApplication** (file: `backend/main/java/com/trueequity/TrueEquityIngestionApplication.java`). The backend runs on port 8080. Start it before the frontend.
 
 ### Scheduled Jobs
 
@@ -82,7 +82,7 @@ API Provider → Data Ingestion Service → Database
 ### Project Structure
 
 ```
-src/main/java/com/trueequity/
+backend/main/java/com/trueequity/
 ├── api/dto/           Data transfer objects
 ├── api/provider/      API provider implementations
 ├── config/            Configuration
