@@ -1,6 +1,103 @@
 # TrueEquity
 
-Stock analysis platform with a Java backend for data ingestion and a Next.js frontend for analysis and recommendations.
+Stock analysis platform with a Java Spring Boot backend for data ingestion and a Next.js frontend for analysis and recommendations.
+
+---
+
+## What you need
+
+- Java 17+
+- Maven 3.6+
+- Node.js 18+ and npm
+
+The setup script checks and installs all of these automatically if missing.
+
+---
+
+## Quick Start (Recommended)
+
+Run the setup script — it installs missing dependencies, creates the environment file, builds the backend, and starts both services.
+
+**Windows:**
+```bat
+setup.bat
+```
+
+**macOS / Linux:**
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+The script will:
+1. Check and install Java 17 if missing
+2. Check and install Maven if missing
+3. Check and install Node.js 20 if missing
+4. Create `frontend/.env.local` with database credentials automatically
+5. Install frontend dependencies (`npm install`)
+6. Build the backend (`mvn clean install`)
+7. Start both the backend (port 8080) and frontend (port 3000)
+
+Open **http://localhost:3000** in your browser once both services are running.
+
+---
+
+## Manual Setup (step by step)
+
+If you prefer to run each step yourself:
+
+**Terminal 1 – Backend:**
+```bash
+cd TrueEquity
+mvn clean install
+mvn spring-boot:run
+```
+
+**Terminal 2 – Frontend:**
+```bash
+cd TrueEquity/frontend
+npm install
+npm run dev
+```
+
+Backend: http://localhost:8080  
+Frontend: http://localhost:3000
+
+---
+
+## Environment File
+
+Create `frontend/.env.local` with the following content (the setup script creates this automatically — no manual action needed):
+
+```env
+DATABASE_HOST=db.laohdpupmjhfsupcomzv.supabase.co
+DATABASE_PORT=5432
+DATABASE_NAME=postgres
+DATABASE_USER=postgres
+DATABASE_PASSWORD=-6C,*wamDmFQ-DY
+JAVA_BACKEND_URL=http://localhost:8080
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+No local PostgreSQL installation is required. The application connects to a hosted Supabase database that already contains the schema and data.
+
+---
+
+## Common Issues
+
+- **`java: command not found` or `mvn: command not found`**  
+  Run `setup.bat` (Windows) or `setup.sh` (macOS/Linux) — it installs these automatically.
+
+- **Port 8080 already in use**  
+  Another instance of the backend is running. On Windows:
+  ```bat
+  netstat -ano | findstr :8080
+  taskkill /PID <PID> /F
+  ```
+  On macOS/Linux:
+  ```bash
+  lsof -ti:8080 | xargs kill -9
+  ```
 
 ---
 
@@ -9,138 +106,84 @@ Stock analysis platform with a Java backend for data ingestion and a Next.js fro
 TrueEquity is a full-stack application that fetches stock data from market APIs, computes valuation and risk scores, and serves a web UI with BUY/HOLD/SELL/AVOID recommendations. The backend runs as an independent service; the frontend connects to it and to PostgreSQL for fast queries.
 
 **This repository contains:**
-- **Backend** – Java Spring Boot data ingestion service (this root)
+- **Backend** – Java Spring Boot data ingestion service (project root)
 - **Frontend** – Next.js app in the `frontend/` directory
+- **Database** – Schema in `database/schema.sql` (already applied to the hosted database)
 
 ---
 
 ## Technology Stack
 
-| Layer      | Technologies |
-|-----------|---------------|
+| Layer     | Technologies                                  |
+|-----------|-----------------------------------------------|
 | Backend   | Java 17, Spring Boot 3.2.0, Spring Scheduler, JDBC |
-| Database  | PostgreSQL |
-| Frontend  | Next.js 14+, TypeScript, Tailwind CSS |
+| Database  | PostgreSQL (hosted on Supabase)               |
+| Frontend  | Next.js 14+, TypeScript, Tailwind CSS         |
+| APIs      | Yahoo Finance, FMP (Financial Modeling Prep)  |
 
 ---
 
-## Backend (Data Ingestion Service)
-
-The backend runs independently and:
-- Fetches stock data from financial APIs (prices, volume, fundamentals)
-- Normalizes and stores data in PostgreSQL
-- Pre-computes scores (valuation, health, growth, risk)
-- Keeps data updated for fast frontend queries
-
-### Prerequisites
-
-- Java 17 or higher
-- Maven 3.6+
-- PostgreSQL (backend connects to the database configured in `application.properties`; data is read from this database)
-
-### Configuration
-
-Database connection (URL, username, password) is set in `backend/main/resources/application.properties`, or via environment variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. No need to create a database or apply schema for evaluation—use the configured connection; data is served from this database.
-
-### How to run the backend
-
-1. Open a terminal and go to the **project root folder** (the folder that contains `pom.xml` and the `backend` folder).  
-   Example (Windows): `cd path\to\TrueEquity`  
-   Example (macOS/Linux): `cd /path/to/TrueEquity`
-
-2. Run:
-
-```bash
-mvn clean install
-mvn spring-boot:run
-```
-
-This starts the application whose main class is **TrueEquityIngestionApplication** (file: `backend/main/java/com/trueequity/TrueEquityIngestionApplication.java`). The backend runs on port 8080. Start it before the frontend.
-
-### Scheduled Jobs
-
-- **Price updates** – Every 15 minutes during market hours (9:30 AM–4:00 PM EST)
-- **Fundamentals update** – Daily at 6 PM EST
-- **Score recalculation** – Every hour
-
-### API Providers
-
-- **Yahoo Finance** (no API key required) – prices and some data
-- **FMP (Financial Modeling Prep)** (API key in `application.properties`) – fundamentals, key metrics; used in a hybrid with Yahoo
-
-Additional providers can be added by implementing the `DataProvider` interface.
-
-### Data Flow
+## Project Structure
 
 ```
-API Provider → Data Ingestion Service → Database
-                        ↓
-                Metrics Calculation Service
-                        ↓
-                Pre-computed scores (for frontend)
+TrueEquity/
+├── backend/main/java/com/trueequity/
+│   ├── api/dto/           Data transfer objects
+│   ├── api/provider/      API provider implementations (Yahoo, FMP, Hybrid)
+│   ├── config/            Database and scheduler configuration
+│   ├── controller/        REST API controllers
+│   ├── repository/        Data access (JDBC)
+│   ├── scheduler/         Background scheduled jobs
+│   ├── service/           Business logic (scores, RSI, ingestion)
+│   ├── util/              Utility classes
+│   └── TrueEquityIngestionApplication.java
+├── frontend/              Next.js web application
+├── database/              SQL schema
+├── setup.bat              Windows auto-setup and launch script
+└── setup.sh               macOS/Linux auto-setup and launch script
 ```
-
-### Project Structure
-
-```
-backend/main/java/com/trueequity/
-├── api/dto/           Data transfer objects
-├── api/provider/      API provider implementations
-├── config/            Configuration
-├── controller/        REST API controllers
-├── repository/        Data access (JDBC)
-├── scheduler/         Background jobs
-├── service/           Business logic
-├── util/              Utilities
-└── TrueEquityIngestionApplication.java
-```
-
-### Database Tables (main)
-
-- `stocks` – Basic stock info  
-- `stock_prices` – Daily OHLCV (partitioned by year)  
-- `stock_financials` – Fundamentals (quarterly/annual)  
-- `stock_scores` – Pre-computed scores  
-- `technical_indicators` – e.g. RSI  
 
 ---
 
-## Frontend
+## Data Flow
 
-**Prerequisites:** Node.js 18+ and npm.
-
-The web UI is in the `frontend/` folder.
-
-1. Install dependencies and run:
-
-```bash
-cd frontend
-npm install
-npm run dev
 ```
-
-2. **Environment:** Create `frontend/.env.local` (optional; defaults work for local run) with:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_HOST` | PostgreSQL host | `localhost` |
-| `DATABASE_PORT` | PostgreSQL port | `5432` |
-| `DATABASE_NAME` | Database name | `trueequity_market_data` |
-| `DATABASE_USER` | Database user | `postgres` |
-| `DATABASE_PASSWORD` | Database password | (set for your system) |
-| `JAVA_BACKEND_URL` | Backend base URL (for RSI when not in DB) | `http://localhost:8080` |
-| `NEXT_PUBLIC_APP_URL` | Frontend base URL (for API calls from browser) | `http://localhost:3000` |
-
-Frontend runs at http://localhost:3000. Ensure the backend is running (port 8080) for full functionality (e.g. live RSI calculation fallback).
+Yahoo Finance / FMP API
+        ↓
+  Data Ingestion Service (Spring Boot)
+        ↓
+  Metrics Calculation Service
+        ↓
+  PostgreSQL (Supabase) ← → Next.js Frontend
+```
 
 ---
 
-## Running the full application
+## Scheduled Jobs
 
-1. Ensure PostgreSQL is running and the database connection in `application.properties` is correct (data is read from this database).
-2. Start the backend: open terminal, go to project root, run `mvn spring-boot:run`.
-3. Start the frontend: open another terminal, `cd frontend`, then `npm install` and `npm run dev`.
-4. Open http://localhost:3000 in a browser.
+| Job                  | Schedule                              |
+|----------------------|---------------------------------------|
+| Price updates        | Every 15 minutes during market hours (9:30 AM–4:00 PM EST) |
+| Fundamentals update  | Daily at 6 PM EST                     |
+| Score recalculation  | Every hour                            |
+
+---
+
+## Database Tables
+
+| Table                     | Description                                  |
+|---------------------------|----------------------------------------------|
+| `stocks`                  | Basic stock info                             |
+| `stock_prices`            | Daily OHLCV prices (partitioned by year)    |
+| `stock_prices_intraday`  | Intraday prices (partitioned)                |
+| `stock_financials`        | Fundamentals (quarterly/annual)              |
+| `stock_scores`            | Pre-computed valuation scores                |
+| `technical_indicators`    | RSI and other indicators                     |
+| `market_data`             | Market data                                  |
+| `historical_snapshots`    | Historical snapshots                         |
+| `stock_predictions`       | Stock predictions                            |
+| `strategy_backtests`      | Strategy backtest results                    |
+| `ingestion_log`           | Ingestion run log                            |
 
 ---
 
@@ -152,7 +195,7 @@ From the project root:
 mvn test
 ```
 
-Runs backend unit and API tests (e.g. `MetricsCalculationServiceTest`, `TechnicalIndicatorServiceTest`, `RSIControllerTest`).
+Runs backend unit and API tests: `MetricsCalculationServiceTest`, `TechnicalIndicatorServiceTest`, `RSIControllerTest`.
 
 ---
 
@@ -165,3 +208,7 @@ This platform is for informational and educational purposes only. Nothing herein
 ## License
 
 © 2026 TrueEquity. All rights reserved.
+
+---
+
+Academic project for DLBCSPJWD01 (IU). Developed by Vivek Dudhat.

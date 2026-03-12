@@ -246,10 +246,11 @@ CREATE TABLE technical_indicators (
     support_level DECIMAL(12, 4),
     resistance_level DECIMAL(12, 4),
     
+    timeframe VARCHAR(10) DEFAULT '1d', -- e.g. 1h, 30m, 2h, 1d
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (symbol) REFERENCES stocks(symbol) ON DELETE CASCADE,
-    UNIQUE(symbol, date)
+    UNIQUE(symbol, date, timeframe)
 );
 
 CREATE INDEX idx_indicators_symbol_date ON technical_indicators(symbol, date DESC);
