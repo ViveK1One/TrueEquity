@@ -45,7 +45,8 @@ Database connection (URL, username, password) is set in `backend/main/resources/
 ### How to run the backend
 
 1. Open a terminal and go to the **project root folder** (the folder that contains `pom.xml` and the `backend` folder).  
-   Example: `cd C:\Users\vivek\Downloads\TrueEquity` (or the path where you have the project).
+   Example (Windows): `cd path\to\TrueEquity`  
+   Example (macOS/Linux): `cd /path/to/TrueEquity`
 
 2. Run:
 
