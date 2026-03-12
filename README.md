@@ -33,7 +33,7 @@ The script will:
 1. Check and install Java 17 if missing
 2. Check and install Maven if missing
 3. Check and install Node.js 20 if missing
-4. Create `frontend/.env.local` with database credentials automatically
+4. Create `frontend/.env.local` from the template below
 5. Install frontend dependencies (`npm install`)
 6. Build the backend (`mvn clean install`)
 7. Start both the backend (port 8080) and frontend (port 3000)
@@ -67,19 +67,19 @@ Frontend: http://localhost:3000
 
 ## Environment File
 
-Create `frontend/.env.local` with the following content (the setup script creates this automatically — no manual action needed):
+Create `frontend/.env.local` with the following variables (use given database credentials):
 
 ```env
-DATABASE_HOST=db.laohdpupmjhfsupcomzv.supabase.co
+DATABASE_HOST=<your-database-host>
 DATABASE_PORT=5432
-DATABASE_NAME=postgres
-DATABASE_USER=postgres
-DATABASE_PASSWORD=-6C,*wamDmFQ-DY
+DATABASE_NAME=<your-database-name>
+DATABASE_USER=<your-database-user>
+DATABASE_PASSWORD=<your-database-password>
 JAVA_BACKEND_URL=http://localhost:8080
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-No local PostgreSQL installation is required. The application connects to a hosted Supabase database that already contains the schema and data.
+Database credentials are supplied by the author for evaluation. The backend reads the connection from `backend/main/resources/application.properties`.
 
 ---
 
