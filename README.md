@@ -4,93 +4,103 @@ Stock analysis platform with a Java Spring Boot backend for data ingestion and a
 
 ---
 
-## What you need
+## Prerequisites
 
-- Java 17+
-- Maven 3.6+
-- Node.js 18+ and npm
-
-The setup script checks and installs all of these automatically if possible.  
-If automatic installation fails, you can install them manually from:
-
-- Java 17 (Temurin): https://adoptium.net/temurin/releases/?version=17  
-- Maven: https://maven.apache.org/download.cgi  
-- Node.js (LTS 18+): https://nodejs.org/en/download
+- **Java 17+**
+- **Maven (mvnd 1.0.3)**
+- **Node.js 18+ and npm**
 
 ---
 
-## Quick Start (Recommended)
+## Step-by-Step Setup (Windows)
 
-Run the setup script — it installs missing dependencies, creates the environment file, builds the backend, and starts both services.
+### Step 1 — Open the Project
 
-**On Windows (PowerShell or Command Prompt):**
+Open the `TrueEquity` project folder in **VS Code** (or any IDE).
 
-1. Open **PowerShell** or **Command Prompt**.
-2. Change into the project folder (the folder that contains `setup.bat` and `pom.xml`):
-   ```powershell
-   cd C:\path\to\TrueEquity
-   ```
-3. Run the setup script:
-   - In **PowerShell**:
-     ```powershell
-     .\setup.bat
-     ```
-   - In **Command Prompt**:
-     ```bat
-     setup.bat
-     ```
+### Step 2 — Check What Is Already Installed
 
-**On macOS / Linux (Terminal):**
+Open a terminal (PowerShell) inside the IDE and run:
 
-1. Change into the project folder:
-   ```bash
-   cd /path/to/TrueEquity
-   ```
-2. Make the script executable (first run only) and start it:
-   ```bash
-   chmod +x setup.sh
-   ./setup.sh
-   ```
-
-The script will:
-1. Check and install Java 17 if missing
-2. Check and install Maven if missing
-3. Check and install Node.js 20 if missing
-4. Create `frontend/.env.local` from the template below
-5. Install frontend dependencies (`npm install`)
-6. Build the backend (`mvn clean install`)
-7. Start both the backend (port 8080) and frontend (port 3000)
-
-Open **http://localhost:3000** in your browser once both services are running.
-
----
-
-## Manual Setup (step by step)
-
-If you prefer to run each step yourself:
-
-**Terminal 1 – Backend:**
-```bash
-cd TrueEquity
-mvn clean install
-mvn spring-boot:run
+```powershell
+java -version
+node -v
+mvn -version
 ```
 
-**Terminal 2 – Frontend:**
-```bash
-cd TrueEquity/frontend
-npm install
-npm run dev
+If all three commands return a version number, skip to **Step 6**. Otherwise, install whatever is missing using the steps below.
+
+### Step 3 — Install Java 17 (if missing)
+
+1. Download the installer from: https://adoptium.net/temurin/releases/?version=17
+2. Run the installer.
+3. **During installation, select the option to add Java to the system PATH automatically.**
+4. After installation, close and reopen the terminal, then verify:
+
+```powershell
+java -version
 ```
 
-Backend: http://localhost:8080  
-Frontend: http://localhost:3000
+### Step 4 — Install Node.js (if missing)
 
----
+1. Download the LTS installer from: https://nodejs.org/en/download
+2. Run the installer and complete the setup.
+3. Add the Node.js bin path to the **System Environment Variables**:
+   - Open **Start → search "Environment Variables" → Edit the system environment variables → Environment Variables**.
+   - Under **System variables**, select `Path` and click **Edit**.
+   - Click **New** and add:
 
-## Environment File
+```
+C:\Program Files\nodejs\node_modules\npm\bin
+```
 
-Create `frontend/.env.local` with the following variables (use given database credentials):
+4. Close and reopen the terminal, then verify:
+
+```powershell
+node -v
+npm -v
+```
+
+### Step 5 — Install Maven (if missing)
+
+Maven requires a few extra steps because it comes as a zip file.
+
+1. Download the Maven zip from:
+   https://dlcdn.apache.org/maven/mvnd/1.0.3/maven-mvnd-1.0.3-windows-amd64.zip
+
+2. **Unzip** the downloaded file to a folder (e.g. your `Downloads` folder).
+
+3. Add the Maven `bin` path to the **System Environment Variables**:
+   - Open **Start → search "Environment Variables" → Edit the system environment variables → Environment Variables**.
+   - Under **System variables**, select `Path` and click **Edit**.
+   - Click **New** and add the path to the `mvn\bin` folder inside the unzipped directory, for example:
+
+```
+C:\Users\<your-username>\Downloads\maven-mvnd-1.0.3-windows-amd64\maven-mvnd-1.0.3-windows-amd64\mvn\bin
+```
+
+   Replace `<your-username>` with your actual Windows username.
+
+4. Set the Maven executable path in VS Code:
+   - In VS Code, press **Ctrl + ,** to open Settings.
+   - Search for **maven executable path**.
+   - Paste the full path to `mvnd.exe`, for example:
+
+```
+C:\Users\<your-username>\Downloads\maven-mvnd-1.0.3-windows-amd64\maven-mvnd-1.0.3-windows-amd64\bin\mvnd.exe
+```
+
+   Replace `<your-username>` with your actual Windows username.
+
+5. **Close VS Code completely** and reopen it, then verify in the terminal:
+
+```powershell
+mvn -version
+```
+
+### Step 6 — Create the Environment File
+
+Create a file named `.env.local` inside the `frontend/` folder with the following content (use the database credentials provided by the author):
 
 ```env
 DATABASE_HOST=<your-database-host>
@@ -104,23 +114,53 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 Database credentials are supplied by the author for evaluation. The backend reads the connection from `backend/main/resources/application.properties`.
 
+### Step 7 — Run the Backend
+
+Open a terminal in VS Code at the **project root** (`TrueEquity/`) and run:
+
+```powershell
+mvn clean install
+mvn spring-boot:run
+```
+
+The backend will start on **http://localhost:8080**.
+
+### Step 8 — Run the Frontend
+
+Open a **second terminal** in VS Code, navigate to the frontend folder, install dependencies, and start the dev server:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend will start on **http://localhost:3000**.
+
+### Step 9 — Open the App
+
+Open **http://localhost:3000** in your browser. Both services must be running at the same time.
+
 ---
 
 ## Common Issues
 
-- **`java: command not found` or `mvn: command not found`**  
-  Run `setup.bat` (Windows) or `setup.sh` (macOS/Linux) — it installs these automatically.
+- **`java: command not found`**
+  Make sure Java is installed and added to the system PATH. Restart the terminal after installation.
 
-- **Port 8080 already in use**  
-  Another instance of the backend is running. On Windows:
-  ```bat
-  netstat -ano | findstr :8080
-  taskkill /PID <PID> /F
-  ```
-  On macOS/Linux:
-  ```bash
-  lsof -ti:8080 | xargs kill -9
-  ```
+- **`mvn: command not found`**
+  Make sure the Maven `mvn\bin` path is added to the system PATH and VS Code has been restarted.
+
+- **`node: command not found`**
+  Make sure Node.js is installed and its bin path is added to the system PATH.
+
+- **Port 8080 already in use**
+  Another instance of the backend is running. Find and kill it:
+
+```powershell
+netstat -ano | findstr :8080
+taskkill /PID <PID> /F
+```
 
 ---
 
@@ -162,8 +202,7 @@ TrueEquity/
 │   └── TrueEquityIngestionApplication.java
 ├── frontend/              Next.js web application
 ├── database/              SQL schema
-├── setup.bat              Windows auto-setup and launch script
-└── setup.sh               macOS/Linux auto-setup and launch script
+└── docs/                  Documentation
 ```
 
 ---
