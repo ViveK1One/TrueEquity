@@ -10,7 +10,12 @@ Stock analysis platform with a Java Spring Boot backend for data ingestion and a
 - Maven 3.6+
 - Node.js 18+ and npm
 
-The setup script checks and installs all of these automatically if missing.
+The setup script checks and installs all of these automatically if possible.  
+If automatic installation fails, you can install them manually from:
+
+- Java 17 (Temurin): https://adoptium.net/temurin/releases/?version=17  
+- Maven: https://maven.apache.org/download.cgi  
+- Node.js (LTS 18+): https://nodejs.org/en/download
 
 ---
 
@@ -18,16 +23,34 @@ The setup script checks and installs all of these automatically if missing.
 
 Run the setup script — it installs missing dependencies, creates the environment file, builds the backend, and starts both services.
 
-**Windows:**
-```bat
-setup.bat
-```
+**On Windows (PowerShell or Command Prompt):**
 
-**macOS / Linux:**
-```bash
-chmod +x setup.sh
-./setup.sh
-```
+1. Open **PowerShell** or **Command Prompt**.
+2. Change into the project folder (the folder that contains `setup.bat` and `pom.xml`):
+   ```powershell
+   cd C:\path\to\TrueEquity
+   ```
+3. Run the setup script:
+   - In **PowerShell**:
+     ```powershell
+     .\setup.bat
+     ```
+   - In **Command Prompt**:
+     ```bat
+     setup.bat
+     ```
+
+**On macOS / Linux (Terminal):**
+
+1. Change into the project folder:
+   ```bash
+   cd /path/to/TrueEquity
+   ```
+2. Make the script executable (first run only) and start it:
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh
+   ```
 
 The script will:
 1. Check and install Java 17 if missing
