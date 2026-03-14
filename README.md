@@ -100,19 +100,7 @@ mvn -version
 
 ### Step 6 — Create the Environment File
 
-Create a file named `.env.local` inside the `frontend/` folder with the following content (use the database credentials provided by the author):
-
-```env
-DATABASE_HOST=<your-database-host>
-DATABASE_PORT=5432
-DATABASE_NAME=<your-database-name>
-DATABASE_USER=<your-database-user>
-DATABASE_PASSWORD=<your-database-password>
-JAVA_BACKEND_URL=http://localhost:8080
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-Database credentials are supplied by the author for evaluation. The backend reads the connection from `backend/main/resources/application.properties`.
+Create a file named `.env.local` inside the `frontend/` folder, using `frontend/.env.local.example` as a template. Copy the example file and rename the copy to `.env.local`, then fill in the values with the details provided on the title slide of the project presentation (database and app URLs supplied by the author for evaluation).
 
 ### Step 7 — Run the Backend
 
