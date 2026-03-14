@@ -189,8 +189,7 @@ TrueEquity/
 │   ├── util/              Utility classes
 │   └── TrueEquityIngestionApplication.java
 ├── frontend/              Next.js web application
-├── database/              SQL schema
-└── docs/                  Documentation
+└── database/              SQL schema
 ```
 
 ---
